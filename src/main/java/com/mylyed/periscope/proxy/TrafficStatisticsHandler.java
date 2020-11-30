@@ -23,13 +23,14 @@ import io.netty.channel.ChannelPromise;
 import io.netty.channel.FileRegion;
 
 /**
- * 流量统计
+ * TODO 流量统计
  */
 public class TrafficStatisticsHandler extends ChannelDuplexHandler {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        ctx.fireChannelRead(msg);
+
+        long calculateSize = calculateSize(msg);
     }
 
     @Override

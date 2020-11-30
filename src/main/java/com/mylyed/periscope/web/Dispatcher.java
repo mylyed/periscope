@@ -15,6 +15,9 @@ import static io.netty.handler.codec.http.HttpHeaderNames.CONTENT_TYPE;
 import static io.netty.handler.codec.http.HttpResponseStatus.NOT_FOUND;
 import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 
+/**
+ * http请求分发
+ */
 public class Dispatcher {
 
     private static Map<String, BiFunction<ChannelHandlerContext, FullHttpRequest, FullHttpResponse>> handler =
@@ -26,10 +29,24 @@ public class Dispatcher {
 
     static final HttpRequestEncoderWrapper httpRequestEncoderWrapper = new HttpRequestEncoderWrapper();
 
+    /**
+     * 分发入口
+     *
+     * @param ctx
+     * @param request
+     * @return
+     */
     public static FullHttpResponse handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         return handler.getOrDefault(request.uri(), Dispatcher::notFound).apply(ctx, request);
     }
 
+    /**
+     * 404响应
+     *
+     * @param ctx
+     * @param request
+     * @return
+     */
     private static FullHttpResponse notFound(ChannelHandlerContext ctx, HttpRequest request) {
         String notFound = "404 not found";
         ByteBuf buffer = ByteBufUtil.wrappedBuffer(ctx, notFound.getBytes());
@@ -39,11 +56,16 @@ public class Dispatcher {
         return response;
     }
 
+    /**
+     * 首页响应
+     *
+     * @param ctx
+     * @param request
+     * @return
+     */
     private static FullHttpResponse index(ChannelHandlerContext ctx, FullHttpRequest request) {
-
         List<Object> out = new ArrayList<>();
         httpRequestEncoderWrapper.encode(ctx, request, out);
-
         ByteBuf buffer = ctx.alloc().buffer();
         buffer.writeBytes("欢迎使用\n".getBytes());
         for (Object object : out) {
@@ -55,11 +77,15 @@ public class Dispatcher {
         return response;
     }
 
+    /**
+     * 缓存时间
+     */
     public static final int HTTP_CACHE_SECONDS = 3600;
 
     /**
      * 网站图标
      *
+     * @param ctx
      * @param request
      * @return
      */

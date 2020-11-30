@@ -27,7 +27,7 @@ import static io.netty.handler.codec.http.HttpResponseStatus.INTERNAL_SERVER_ERR
  **/
 public class ProxyHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
-    static final String LOGGER_NAME = "准备器";
+    static final String LOGGER_NAME = "代理";
     static final Logger loggerHttp = LoggerFactory.getLogger(LOGGER_NAME + "HTTP");
     static final Logger loggerHttps = LoggerFactory.getLogger(LOGGER_NAME + "HTTPS");
     static final Logger logger = LoggerFactory.getLogger(LOGGER_NAME);

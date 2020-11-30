@@ -6,6 +6,8 @@ import io.netty.handler.codec.http.HttpRequestEncoder;
 import java.util.List;
 
 /**
+ * 用于暴露HttpRequestEncoder的编码方法
+ *
  * @author lilei
  * @create 2020-11-28
  **/

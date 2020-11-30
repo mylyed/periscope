@@ -62,6 +62,12 @@ public class WebRequestHandler extends SimpleChannelInboundHandler<FullHttpReque
         }
     }
 
+    /**
+     * 记录日志
+     *
+     * @param ctx
+     * @param request
+     */
     private static void log(ChannelHandlerContext ctx, HttpRequest request) {
         //获取Host和port
         String hostAndPortStr = request.headers().get(HttpHeaderNames.HOST);
@@ -80,6 +86,7 @@ public class WebRequestHandler extends SimpleChannelInboundHandler<FullHttpReque
     @Override
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
         ctx.flush();
+        //手动读下一个请求
         ctx.read();
     }
 

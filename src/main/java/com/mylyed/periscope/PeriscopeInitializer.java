@@ -16,7 +16,7 @@
 package com.mylyed.periscope;
 
 import com.mylyed.periscope.proxy.Constant;
-import io.netty.channel.ChannelHandler;
+import com.mylyed.periscope.proxy.TrafficStatisticsHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
@@ -30,9 +30,6 @@ import io.netty.handler.stream.ChunkedWriteHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.LinkedHashSet;
-import java.util.Set;
-
 public class PeriscopeInitializer extends ChannelInitializer<SocketChannel> {
 
     Logger logger = LoggerFactory.getLogger("代理初始化器");
@@ -45,26 +42,19 @@ public class PeriscopeInitializer extends ChannelInitializer<SocketChannel> {
     @Override
     public void initChannel(SocketChannel ch) {
         logger.debug("initChannel");
-        //目的是为了https代理的时候移除
-        final Set<ChannelHandler> channelHandlers = new LinkedHashSet<>();
-
-        //http 请求解码 以及响应编码
-        channelHandlers.add(new HttpServerCodec());
-        //解决压缩问题
-        channelHandlers.add(new HttpContentDecompressor());
-        channelHandlers.add(new ChunkedWriteHandler());
-        //聚合 http请求
-        channelHandlers.add(new HttpObjectAggregator(Constant.HTTP_OBJECT_AGGREGATOR_MAX_CONTENT_LENGTH));
-        //代理
-        channelHandlers.add(new PrepareHandler());
-
         ChannelPipeline pipeline = ch.pipeline();
+        pipeline.addLast(new TrafficStatisticsHandler());
         if (sslCtx != null) {
             pipeline.addLast(sslCtx.newHandler(ch.alloc()));
         }
         pipeline.addLast(new LoggingHandler(LogLevel.TRACE));
-        for (ChannelHandler channelHandler : channelHandlers) {
-            pipeline.addLast(channelHandler);
-        }
+        //http 请求解码 以及响应编码
+        pipeline.addLast(new HttpServerCodec());
+        //解决压缩问题
+        pipeline.addLast(new HttpContentDecompressor());
+        pipeline.addLast(new ChunkedWriteHandler());
+        //聚合 http请求
+        pipeline.addLast(new HttpObjectAggregator(Constant.HTTP_OBJECT_AGGREGATOR_MAX_CONTENT_LENGTH));
+        pipeline.addLast(new PrepareHandler());
     }
 }
