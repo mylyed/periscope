@@ -14,7 +14,7 @@ public class HttpClientTest {
     static boolean useProxy = true;
 
     public static void main(String[] args) throws Exception {
-        String response = doGet("http://127.0.0.1:8080?ip=127.0.0.1");
+        String response = doGet("http://192.168.21.99:35052/swagger-ui.html#");
         System.out.println("响应信息：\n" + response);
     }
 

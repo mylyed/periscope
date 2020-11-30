@@ -38,8 +38,8 @@ public final class PeriscopeProxyServer {
 
         SelfSignedCertificate ssc = new SelfSignedCertificate();
         SslContext sslCtx = SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey()).build();
-//        sslCtx = null;
-        LOCAL_PORT = 443;
+        sslCtx = null;
+//        LOCAL_PORT = 443;
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         try {

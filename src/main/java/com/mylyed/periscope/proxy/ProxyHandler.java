@@ -14,6 +14,7 @@ import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -48,6 +49,7 @@ public class ProxyHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
         //TODO 验证账户信息
 
         setHostPort(ctx, request);
+        MDC.put("host", host + ":" + port + "|" + request.uri());
 
         request.headers().remove(HttpHeaderNames.PROXY_AUTHORIZATION);
         String proxyConnection = request.headers().get(HttpHeaderNames.PROXY_CONNECTION);

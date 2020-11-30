@@ -16,7 +16,6 @@
 package com.mylyed.periscope;
 
 import com.mylyed.periscope.proxy.Constant;
-import com.mylyed.periscope.proxy.TrafficStatisticsHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
@@ -32,7 +31,7 @@ import org.slf4j.LoggerFactory;
 
 public class PeriscopeInitializer extends ChannelInitializer<SocketChannel> {
 
-    Logger logger = LoggerFactory.getLogger("代理初始化器");
+    static Logger logger = LoggerFactory.getLogger(PeriscopeInitializer.class);
     private final SslContext sslCtx;
 
     public PeriscopeInitializer(SslContext sslCtx) {
@@ -43,7 +42,6 @@ public class PeriscopeInitializer extends ChannelInitializer<SocketChannel> {
     public void initChannel(SocketChannel ch) {
         logger.debug("initChannel");
         ChannelPipeline pipeline = ch.pipeline();
-        pipeline.addLast(new TrafficStatisticsHandler());
         if (sslCtx != null) {
             pipeline.addLast(sslCtx.newHandler(ch.alloc()));
         }
