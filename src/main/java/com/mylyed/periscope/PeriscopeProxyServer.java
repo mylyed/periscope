@@ -22,15 +22,24 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.SelfSignedCertificate;
 
 /**
  * 代理
  */
 public final class PeriscopeProxyServer {
 
-    static final int LOCAL_PORT = Integer.parseInt(System.getProperty("localPort", "1081"));
+    static int LOCAL_PORT = Integer.parseInt(System.getProperty("localPort", "1081"));
 
     public static void main(String[] args) throws Exception {
+
+
+        SelfSignedCertificate ssc = new SelfSignedCertificate();
+        SslContext sslCtx = SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey()).build();
+//        sslCtx = null;
+        LOCAL_PORT = 443;
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         try {
@@ -39,7 +48,7 @@ public final class PeriscopeProxyServer {
             b.group(bossGroup, workerGroup)
                     .channel(NioServerSocketChannel.class)
                     .handler(new LoggingHandler(LogLevel.INFO))
-                    .childHandler(new PeriscopeInitializer())
+                    .childHandler(new PeriscopeInitializer(sslCtx))
                     //手动控制读写
                     .childOption(ChannelOption.AUTO_READ, false)
                     .bind(LOCAL_PORT).sync().channel().closeFuture().sync();

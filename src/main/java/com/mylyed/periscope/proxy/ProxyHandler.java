@@ -1,5 +1,6 @@
 package com.mylyed.periscope.proxy;
 
+import com.mylyed.periscope.PrepareHandler;
 import com.mylyed.periscope.common.ChannelUtil;
 import com.mylyed.periscope.proxy.http.ClientHttpRequestHandler;
 import com.mylyed.periscope.proxy.http.ServerHttpResponseHandler;
@@ -14,8 +15,9 @@ import io.netty.handler.logging.LoggingHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collection;
-import java.util.Collections;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Objects;
 
 import static io.netty.handler.codec.http.HttpResponseStatus.INTERNAL_SERVER_ERROR;
 
@@ -23,7 +25,7 @@ import static io.netty.handler.codec.http.HttpResponseStatus.INTERNAL_SERVER_ERR
  * @author lilei
  * @create 2020-11-02
  **/
-public class PrepareHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
+public class ProxyHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
     static final String LOGGER_NAME = "准备器";
     static final Logger loggerHttp = LoggerFactory.getLogger(LOGGER_NAME + "HTTP");
@@ -32,22 +34,28 @@ public class PrepareHandler extends SimpleChannelInboundHandler<FullHttpRequest>
 
     private String host;
     private int port;
-    /**
-     * 通道上的处理器
-     */
-    private final Collection<ChannelHandler> channelHandlers;
 
 
-    public PrepareHandler(Collection<ChannelHandler> channelHandlers) {
+    public ProxyHandler() {
         //不能自动释放
         super(false);
-        this.channelHandlers = Collections.unmodifiableCollection(channelHandlers);
     }
 
     protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) throws Exception {
         //开始干活
         logger.debug("代理请求信息：{}", request);
+
+        //TODO 验证账户信息
+
         setHostPort(ctx, request);
+
+        request.headers().remove(HttpHeaderNames.PROXY_AUTHORIZATION);
+        String proxyConnection = request.headers().get(HttpHeaderNames.PROXY_CONNECTION);
+        if (Objects.nonNull(proxyConnection)) {
+            request.headers().set(HttpHeaderNames.CONNECTION, proxyConnection);
+            request.headers().remove(HttpHeaderNames.PROXY_CONNECTION);
+        }
+
         if (request.method().equals(HttpMethod.CONNECT)) {
             //代理https请求
             proxyHttps(ctx, request);
@@ -80,15 +88,15 @@ public class PrepareHandler extends SimpleChannelInboundHandler<FullHttpRequest>
     }
 
     private void proxyHttps(final ChannelHandlerContext ctx, FullHttpRequest request) {
+
+
         final Channel clientChannel = ctx.channel();
 
-        ChannelFuture responseFuture = clientChannel.write(
+        ChannelFuture responseFuture = clientChannel.writeAndFlush(
                 new DefaultHttpResponse(
                         request.protocolVersion(),
                         new HttpResponseStatus(200, "Connection Established")
                 ));
-        //响应成功
-        // TODO 待优化 能否同时响应和请求？
 
         responseFuture.addListener((ChannelFutureListener) channelFuture -> {
             if (channelFuture.isSuccess()) {
@@ -112,19 +120,30 @@ public class PrepareHandler extends SimpleChannelInboundHandler<FullHttpRequest>
                 serverBootstrap.connect(host, port).addListener((ChannelFutureListener) future -> {
                     if (future.isSuccess()) {
                         loggerHttps.debug("和真正的服务器连接好了，准备发送报文");
-                        //全部移除
-                        channelHandlers.forEach(ctx.pipeline()::remove);
+                        List<String> names = ctx.pipeline().names();
+                        try {
+                            //移除几个关键性处理器
+                            //FIXME 这里有点问题
+                            DefaultChannelPipeline pipeline = (DefaultChannelPipeline) ctx.pipeline();
+                            pipeline.removeIfExists(HttpServerCodec.class);
+                            pipeline.removeIfExists(HttpObjectAggregator.class);
+                            pipeline.removeIfExists(PrepareHandler.class);
+                        } catch (NoSuchElementException e) {
+                            logger.error("names:{}", names);
+                            logger.error("调整处理器出错", e);
+                            responseError(ctx, request);
+                            return;
+                        }
                         //加入处理https请求处理器
                         ctx.pipeline().addLast(new ClientHttpsRequestHandler(future.channel()));
                         //客户端自动读
                         clientChannel.config().setAutoRead(true);
                     } else {
-                        loggerHttps.debug("服务端建立连接失败");
+                        loggerHttps.debug("服务端建立连接失败：{}:{}", host, port);
                         future.channel().close();
                         ChannelUtil.closeOnFlush(clientChannel);
                     }
                 });
-
             } else {
                 responseError(ctx, request);
             }
@@ -157,14 +176,13 @@ public class PrepareHandler extends SimpleChannelInboundHandler<FullHttpRequest>
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10_000)
                 //不能自动读取
                 .option(ChannelOption.AUTO_READ, false);
-
         serverBootstrap.connect(host, port).addListener((ChannelFutureListener) future -> {
             if (future.isSuccess()) {
                 loggerHttp.debug("和真正的服务器连接好了，准备发送报文");
                 clientChannel.pipeline().addLast(new ClientHttpRequestHandler(future.channel()));
                 ctx.fireChannelRead(request);
             } else {
-                loggerHttp.debug("连接服务端失败");
+                loggerHttp.debug("连接服务端失败:{}:{}", host, port);
                 clientChannel.close();
                 future.channel().close();
             }

@@ -2,11 +2,36 @@
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] [%X{channel}] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
 
-    <root level="INFO">
+    <!--    按线程输出日志-->
+    <appender name="frameworkthread" class="ch.qos.logback.classic.sift.SiftingAppender">
+        <discriminator class="com.mylyed.periscope.common.ThreadDiscriminator">
+            <key>threadName</key>
+        </discriminator>
+        <sift>
+            <appender name="FILE-${threadName}" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                <append>false</append>
+                <encoder>
+                    <Encoding>UTF-8</Encoding>
+                    <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS}[%c][%thread][%X{channel}][%p]-%m%n</pattern>
+                </encoder>
+                <rollingPolicy
+                        class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                    <fileNamePattern>./log/${threadName}-%d{yyyy-MM-dd}.%i.log
+                    </fileNamePattern>
+                    <maxFileSize>100MB</maxFileSize>
+                    <maxHistory>60</maxHistory>
+                    <totalSizeCap>20GB</totalSizeCap>
+                </rollingPolicy>
+            </appender>
+        </sift>
+    </appender>
+
+    <root level="DEBUG">
+        <appender-ref ref="frameworkthread"/>
         <appender-ref ref="STDOUT"/>
     </root>
 </configuration>

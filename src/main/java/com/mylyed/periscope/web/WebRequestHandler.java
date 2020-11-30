@@ -15,16 +15,12 @@
  */
 package com.mylyed.periscope.web;
 
-import com.mylyed.periscope.common.ChannelUtil;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpUtil;
-import io.netty.util.ReferenceCountUtil;
+import io.netty.handler.codec.DecoderResult;
+import io.netty.handler.codec.http.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,27 +35,19 @@ public class WebRequestHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     protected static final Logger log = LoggerFactory.getLogger(WebRequestHandler.class);
 
-    public WebRequestHandler() {
-        //不要自动释放
-        super(false);
-    }
-
-    private boolean isWebRequestHandler = true;
-
-
-
     @Override
-
     public void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) throws Exception {
-        log.info("request.uri => {}", request.uri());
-        if (!request.uri().startsWith("/")) {
-            ctx.fireChannelRead(request);
-            isWebRequestHandler = false;
-            return;
-        }
         log(ctx, request);
+        DecoderResult decoderResult = request.decoderResult();
         boolean keepAlive = HttpUtil.isKeepAlive(request);
-        FullHttpResponse response = Dispatcher.handle(ctx, request);
+        FullHttpResponse response;
+        if (decoderResult.isFailure()) {
+            //请求有问题
+            keepAlive = false;
+            response = new DefaultFullHttpResponse(request.protocolVersion(), HttpResponseStatus.BAD_REQUEST);
+        } else {
+            response = Dispatcher.handle(ctx, request);
+        }
         response.headers().setInt(CONTENT_LENGTH, response.content().readableBytes());
         if (keepAlive) {
             if (!request.protocolVersion().isKeepAliveDefault()) {
@@ -68,20 +56,18 @@ public class WebRequestHandler extends SimpleChannelInboundHandler<FullHttpReque
         } else {
             response.headers().set(CONNECTION, CLOSE);
         }
-
         ChannelFuture f = ctx.write(response);
         if (!keepAlive) {
             f.addListener(ChannelFutureListener.CLOSE);
         }
-        //手动释放
-        ReferenceCountUtil.release(request);
     }
 
     private static void log(ChannelHandlerContext ctx, HttpRequest request) {
         //获取Host和port
-        String hostAndPortStr = request.headers().get("Host");
-        if (hostAndPortStr == null) {
-            ChannelUtil.closeOnFlush(ctx.channel());
+        String hostAndPortStr = request.headers().get(HttpHeaderNames.HOST);
+        if (hostAndPortStr == null || hostAndPortStr.trim().length() == 0) {
+            log.warn("请求头没有Host信息:{}", request);
+            return;
         }
         String[] hostPortArray = hostAndPortStr.split(":");
         String host = hostPortArray[0];
@@ -93,22 +79,12 @@ public class WebRequestHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     @Override
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-        if (isWebRequestHandler) {
-            ctx.flush();
-            //手动读取读取下一个请求
-            ctx.read();
-        } else {
-            super.channelReadComplete(ctx);
-        }
-
+        ctx.flush();
+        ctx.read();
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        if (isWebRequestHandler) {
-            ctx.close();
-        } else {
-            super.exceptionCaught(ctx, cause);
-        }
+        ctx.close();
     }
 }
