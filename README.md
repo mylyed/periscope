@@ -11,13 +11,13 @@ Client <==> Proxy（persicope） <==> Server
 ```
 实现功能：
 
-[x]支持http代理协议
+[x] 支持http代理协议
 
-[x]支持https代理协议
+[x] 支持https代理协议
 
-[x]支持Socks4代理协议
+[x] 支持Socks4代理协议
 
-[x]支持Socks5代理协议
+[x] 支持Socks5代理协议
 
 程序入口：PeriscopeProxyServer
 
