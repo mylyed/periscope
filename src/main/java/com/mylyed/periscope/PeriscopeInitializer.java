@@ -15,44 +15,27 @@
  */
 package com.mylyed.periscope;
 
-import com.mylyed.periscope.proxy.Constant;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
-import io.netty.handler.codec.http.HttpContentDecompressor;
-import io.netty.handler.codec.http.HttpObjectAggregator;
-import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.stream.ChunkedWriteHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 public class PeriscopeInitializer extends ChannelInitializer<SocketChannel> {
 
     static Logger logger = LoggerFactory.getLogger(PeriscopeInitializer.class);
-    private final SslContext sslCtx;
 
-    public PeriscopeInitializer(SslContext sslCtx) {
-        this.sslCtx = sslCtx;
-    }
 
     @Override
     public void initChannel(SocketChannel ch) {
         logger.debug("initChannel");
+        MDC.put("channel", ch.id().toString());
         ChannelPipeline pipeline = ch.pipeline();
-        if (sslCtx != null) {
-            pipeline.addLast(sslCtx.newHandler(ch.alloc()));
-        }
+        //Socks代理
         pipeline.addLast(new LoggingHandler(LogLevel.TRACE));
-        //http 请求解码 以及响应编码
-        pipeline.addLast(new HttpServerCodec());
-        //解决压缩问题
-        pipeline.addLast(new HttpContentDecompressor());
-        pipeline.addLast(new ChunkedWriteHandler());
-        //聚合 http请求
-        pipeline.addLast(new HttpObjectAggregator(Constant.HTTP_OBJECT_AGGREGATOR_MAX_CONTENT_LENGTH));
-        pipeline.addLast(new PrepareHandler());
+        pipeline.addLast(new UnificationHandler());
     }
 }
