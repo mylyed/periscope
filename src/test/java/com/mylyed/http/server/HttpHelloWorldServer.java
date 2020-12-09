@@ -39,7 +39,7 @@ import java.security.KeyStore;
 public final class HttpHelloWorldServer {
 
     static final boolean SSL = false;
-    static final int PORT = Integer.parseInt(System.getProperty("port", SSL ? "8443" : "8080"));
+    static final int PORT = Integer.parseInt(System.getProperty("port", SSL ? "8443" : "1081"));
 
     public static void main(String[] args) throws Exception {
         // Configure SSL.

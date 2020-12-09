@@ -8,8 +8,12 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.util.CharsetUtil;
 
+import javax.net.ssl.SSLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 
@@ -18,16 +22,18 @@ import java.net.URISyntaxException;
  * @create 2020-11-26
  **/
 public class HttpClientTest2 extends SimpleChannelInboundHandler<HttpObject> {
-    public static void main(String[] args) throws URISyntaxException, InterruptedException {
-        doGet("http://192.168.21.60:35063/user-center-client/ip?ip=127.0.0.1");
+    public static void main(String[] args) throws Exception {
+        doGet("https://segmentfault.com/a/1190000012345156");
     }
 
-    public static void doGet(String httpurl) throws URISyntaxException, InterruptedException {
+    public static void doGet(String httpurl) throws URISyntaxException, InterruptedException, SSLException {
         URI uriSimple = new URI(httpurl);
         String host = uriSimple.getHost();
         int port = uriSimple.getPort();
         Bootstrap b = new Bootstrap();
         EventLoopGroup group = new NioEventLoopGroup();
+        final SslContext sslContext = SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE)
+                .build();
         b.group(group)
                 .channel(NioSocketChannel.class)
                 .handler(new ChannelInitializer<NioSocketChannel>() {
@@ -35,6 +41,7 @@ public class HttpClientTest2 extends SimpleChannelInboundHandler<HttpObject> {
                     protected void initChannel(NioSocketChannel ch) throws Exception {
                         ChannelPipeline pipeline = ch.pipeline();
                         pipeline.addLast("log", new LoggingHandler(LogLevel.INFO));
+                        pipeline.addLast(sslContext.newHandler(ch.alloc()));
                         pipeline.addLast(new HttpClientCodec());
                         pipeline.addLast(new HttpContentDecompressor());//这里要添加解压，不然打印时会乱码
                         pipeline.addLast(new HttpObjectAggregator(Constant.HTTP_OBJECT_AGGREGATOR_MAX_CONTENT_LENGTH));//添加HttpObjectAggregator， HttpClientMsgHandler才会收到FullHttpResponse
@@ -42,6 +49,9 @@ public class HttpClientTest2 extends SimpleChannelInboundHandler<HttpObject> {
                     }
                 });
         System.out.println(String.format("host:%s:%s", host, port));
+
+        port = port < 0 ? (host.startsWith("https") ? 443 : 80) : port;
+
         Channel channel = b.connect(host, port).sync().channel();
         // Prepare the HTTP request.
         System.out.println("开始构造请求");

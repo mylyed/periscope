@@ -1,21 +1,25 @@
 package com.mylyed.periscope.proxy.http;
 
 
+import com.mylyed.periscope.cert.CertGenerator;
 import com.mylyed.periscope.common.ChannelUtil;
 import com.mylyed.periscope.proxy.Constant;
-import com.mylyed.periscope.proxy.RelayHandler;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
-import java.util.List;
+import javax.net.ssl.SSLException;
+import java.security.cert.X509Certificate;
 import java.util.Objects;
 
 import static io.netty.handler.codec.http.HttpResponseStatus.INTERNAL_SERVER_ERROR;
@@ -28,6 +32,9 @@ import static io.netty.handler.codec.http.HttpResponseStatus.INTERNAL_SERVER_ERR
  **/
 public class HttpProxyHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
+    public final static HttpResponseStatus SUCCESS = new HttpResponseStatus(200,
+            "Connection Established");
+
     static final String LOGGER_NAME = "代理";
     static final Logger loggerHttp = LoggerFactory.getLogger(LOGGER_NAME + "HTTP");
     static final Logger loggerHttps = LoggerFactory.getLogger(LOGGER_NAME + "HTTPS");
@@ -35,7 +42,6 @@ public class HttpProxyHandler extends SimpleChannelInboundHandler<FullHttpReques
 
     private String host;
     private int port;
-
 
     public HttpProxyHandler() {
         //不能自动释放
@@ -85,6 +91,7 @@ public class HttpProxyHandler extends SimpleChannelInboundHandler<FullHttpReques
      */
     private void setHostPort(ChannelHandlerContext ctx, FullHttpRequest request) {
         String hostAndPortStr = request.headers().get(HttpHeaderNames.HOST);
+        logger.debug("hostAndPortStr:{}", hostAndPortStr);
         if (hostAndPortStr == null) {
             responseError(ctx, request);
             return;
@@ -96,11 +103,14 @@ public class HttpProxyHandler extends SimpleChannelInboundHandler<FullHttpReques
         MDC.put("host", hostAndPortStr);
     }
 
-    private void proxyHttps(final ChannelHandlerContext ctx, FullHttpRequest request) {
+    private void proxyHttps(final ChannelHandlerContext ctx, FullHttpRequest request) throws SSLException {
 
         final Channel clientChannel = ctx.channel();
 
         Bootstrap serverBootstrap = new Bootstrap();
+
+        final SslContext sslContext = SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE)
+                .build();
 
         serverBootstrap.group(ctx.channel().eventLoop())
                 .channel(ctx.channel().getClass())
@@ -109,7 +119,11 @@ public class HttpProxyHandler extends SimpleChannelInboundHandler<FullHttpReques
                     protected void initChannel(SocketChannel ch) {
                         ChannelPipeline pipeline = ch.pipeline();
                         pipeline.addLast(new LoggingHandler("Proxy(HTTPS) <==> Server", LogLevel.TRACE));
-                        pipeline.addLast(new RelayHandler(clientChannel));
+                        pipeline.addLast(sslContext.newHandler(ch.alloc()));
+                        pipeline.addLast(new HttpClientCodec());
+                        pipeline.addLast(new HttpContentDecompressor());
+                        pipeline.addLast(new HttpObjectAggregator(Constant.HTTP_OBJECT_AGGREGATOR_MAX_CONTENT_LENGTH));
+                        pipeline.addLast(new ServerHttpResponseHandler(clientChannel));
                     }
                 })
                 //超时时间10S
@@ -122,27 +136,26 @@ public class HttpProxyHandler extends SimpleChannelInboundHandler<FullHttpReques
                         loggerHttps.debug("和真正的服务器连接好了，向客户端响应Connection报文");
 
                         ChannelFuture responseFuture = clientChannel.writeAndFlush(
-                                new DefaultHttpResponse(
+                                new DefaultFullHttpResponse(
                                         request.protocolVersion(),
-                                        new HttpResponseStatus(200, "Connection Established")
+                                        SUCCESS
                                 ));
-
                         responseFuture.addListener((ChannelFutureListener) channelFuture -> {
                             if (channelFuture.isSuccess()) {
-                                loggerHttps.debug("CONNECT 响应客户端成功,清理处理器");
-                                //清理处理器
-                                List<String> names = ctx.pipeline().names();
-                                names.stream()
-                                        .filter(s -> s.startsWith(Constant.HTTP_HANDLER_NAME_PREFIX))
-                                        .forEach(ctx.pipeline()::remove);
+                                //动态创建证书
+                                //TODO 缓存
+                                X509Certificate cert = CertGenerator.getCert(host);
+                                SslContext sslCtx = SslContextBuilder
+                                        .forServer(CertGenerator.certificateConfig.getClientKeyPair().getPrivate(), cert).build();
+                                loggerHttps.debug("CONNECT 响应客户端成功");
+                                ctx.pipeline().addFirst(sslCtx.newHandler(ctx.alloc()));
                                 ctx.pipeline().remove(HttpProxyHandler.this);
-                                ctx.pipeline().addLast(new RelayHandler(serverChannel));
+                                ctx.pipeline().addLast(new ClientHttpRequestHandler(serverChannel));
                             } else {
                                 channelFuture.channel().close();
                                 ChannelUtil.closeOnFlush(serverChannel);
                             }
                         });
-
                     } else {
                         loggerHttps.debug("服务端建立连接失败：{}:{}", host, port);
                         future.channel().close();

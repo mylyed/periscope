@@ -94,7 +94,7 @@ public class UnificationHandler extends ByteToMessageDecoder {
                 pipeline.addLast(Constant.HTTP_HANDLER_NAME_PREFIX + "HttpObjectAggregator", new HttpObjectAggregator(Constant.HTTP_OBJECT_AGGREGATOR_MAX_CONTENT_LENGTH));
 
                 pipeline.addLast(new HttpPrepareHandler());
-                //TODO
+
                 break;
         }
 

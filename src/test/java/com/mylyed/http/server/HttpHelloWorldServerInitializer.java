@@ -15,14 +15,15 @@
  */
 package com.mylyed.http.server;
 
+import com.mylyed.periscope.proxy.Constant;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
-import io.netty.handler.codec.http.HttpObjectAggregator;
-import io.netty.handler.codec.http.HttpServerCodec;
+import io.netty.handler.codec.http.*;
+import io.netty.handler.logging.ByteBufFormat;
+import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslContext;
-import io.netty.handler.stream.ChunkedWriteHandler;
 
 public class HttpHelloWorldServerInitializer extends ChannelInitializer<SocketChannel> {
 
@@ -35,16 +36,10 @@ public class HttpHelloWorldServerInitializer extends ChannelInitializer<SocketCh
     @Override
     public void initChannel(SocketChannel ch) {
         ChannelPipeline p = ch.pipeline();
-        p.addLast(new LoggingHandler("日志"));
-        if (sslCtx != null) {
-            p.addLast(sslCtx.newHandler(ch.alloc()));
-        }
-        p.addLast(new LoggingHandler("日志2"));
-        p.addLast(new HttpServerCodec());
-
-        p.addLast(new HttpObjectAggregator(65536));
-        p.addLast(new ChunkedWriteHandler());
-
-        p.addLast(new HttpHelloWorldServerHandler());
+        p.addLast("HttpServerCodec", new HttpServerCodec());
+        p.addLast("HttpServerCodec-after-log", new LoggingHandler(LogLevel.INFO, ByteBufFormat.SIMPLE));
+//        p.addLast("HttpContentCompressor", new HttpContentCompressor());
+        p.addLast("HttpObjectAggregator", new HttpObjectAggregator(Constant.HTTP_OBJECT_AGGREGATOR_MAX_CONTENT_LENGTH));
+        p.addLast("HttpsTestHandler", new HttpsTestHandler());
     }
 }

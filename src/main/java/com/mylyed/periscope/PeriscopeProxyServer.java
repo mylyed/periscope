@@ -41,8 +41,6 @@ public final class PeriscopeProxyServer {
                     .channel(NioServerSocketChannel.class)
                     .handler(new LoggingHandler(LogLevel.INFO))
                     .childHandler(new PeriscopeInitializer())
-//                    //手动控制读写
-//                    .childOption(ChannelOption.AUTO_READ, false)
                     .bind(LOCAL_PORT).sync().channel().closeFuture().sync();
         } finally {
             bossGroup.shutdownGracefully();

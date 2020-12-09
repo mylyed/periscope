@@ -13,7 +13,7 @@ public class ClientHttpRequestHandler extends SimpleChannelInboundHandler<FullHt
 
     final Channel serverChannel;
 
-    protected static final Logger logger = LoggerFactory.getLogger("Client(HTTP) <==> Proxy <==> Server");
+    protected static final Logger logger = LoggerFactory.getLogger("Client(HTTP) <==> Proxy");
 
     public ClientHttpRequestHandler(Channel serverChannel) {
         super(false);

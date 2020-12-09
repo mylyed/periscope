@@ -11,10 +11,10 @@ import java.net.*;
  * @create 2020-11-26
  **/
 public class HttpClientTest {
-    static boolean useProxy = true;
+    static boolean useProxy = false;
 
     public static void main(String[] args) throws Exception {
-        String response = doGet("http://192.168.21.99:35052/swagger-ui.html#");
+        String response = doGet("https://segmentfault.com/a/1190000011811150");
         System.out.println("响应信息：\n" + response);
     }
 
