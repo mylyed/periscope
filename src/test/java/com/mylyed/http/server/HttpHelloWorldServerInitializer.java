@@ -38,7 +38,7 @@ public class HttpHelloWorldServerInitializer extends ChannelInitializer<SocketCh
         ChannelPipeline p = ch.pipeline();
         p.addLast("HttpServerCodec", new HttpServerCodec());
         p.addLast("HttpServerCodec-after-log", new LoggingHandler(LogLevel.INFO, ByteBufFormat.SIMPLE));
-//        p.addLast("HttpContentCompressor", new HttpContentCompressor());
+        p.addLast("HttpContentCompressor", new HttpContentCompressor());
         p.addLast("HttpObjectAggregator", new HttpObjectAggregator(Constant.HTTP_OBJECT_AGGREGATOR_MAX_CONTENT_LENGTH));
         p.addLast("HttpsTestHandler", new HttpsTestHandler());
     }
